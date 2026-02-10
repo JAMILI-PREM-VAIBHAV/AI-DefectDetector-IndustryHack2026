@@ -53,6 +53,7 @@
             transition: all 0.3s;
         }
         .analyze-btn:hover { transform: translateY(-3px); box-shadow: 0 15px 40px rgba(79,70,229,0.5); }
+        .analyze-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
         .image-preview { 
             margin: 30px 0; 
             text-align: center; 
@@ -78,9 +79,10 @@
         }
         .metric-good { border-left: 5px solid #10b981; }
         .metric-bad { border-left: 5px solid #ef4444; }
-        .metric-value { font-size: 2.5em; font-weight: bold; }
+        .metric-value { font-size: 2.5em; font-weight: bold; margin-bottom: 10px; }
         .metric-good .metric-value { color: #10b981; }
         .metric-bad .metric-value { color: #ef4444; }
+        .metric-label { color: #64748b; font-size: 0.9em; }
         .result-card { 
             padding: 40px; 
             border-radius: 20px; 
@@ -112,195 +114,4 @@
             animation: spin 1s linear infinite; 
             margin: 0 auto 20px; 
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @media (max-width: 768px) { 
-            .header h1 { font-size: 2em; } 
-            .upload-section { padding: 20px; } 
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1>🤖 AI Manufacturing Defect Detector</h1>
-            <p>Industry 4.0 Quality Control • 94% Accuracy • Real-time Analysis</p>
-        </div>
-
-        <!-- Upload Section -->
-        <div class="upload-section">
-            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                <h3>📸 Click to upload product image</h3>
-                <p>Supports JPG, PNG • Phone camera photos work perfectly</p>
-            </div>
-            <input type="file" id="fileInput" accept="image/*" onchange="handleImageUpload(event)">
-            <br>
-            <button class="analyze-btn" onclick="analyzeImage()" id="analyzeBtn" disabled>🚀 RUN AI ANALYSIS</button>
-        </div>
-
-        <!-- Preview & Results -->
-        <div id="previewSection"></div>
-        <div id="metricsSection"></div>
-        <div id="resultSection"></div>
-    </div>
-
-    <script>
-        let currentImage = null;
-
-        function handleImageUpload(event) {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    currentImage = e.target.result;
-                    showImagePreview(e.target.result);
-                    document.getElementById('analyzeBtn').disabled = false;
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-
-        function showImagePreview(imgSrc) {
-            document.getElementById('previewSection').innerHTML = `
-                <div class="image-preview">
-                    <h3>🔍 Product Under Inspection</h3>
-                    <img src="${imgSrc}" alt="Product">
-                </div>
-            `;
-        }
-
-        function analyzeImage() {
-            if (!currentImage) {
-                alert('Please upload an image first!');
-                return;
-            }
-
-            // Show loading
-            document.getElementById('previewSection').innerHTML += `
-                <div class="loading">
-                    <div class="loading-spinner"></div>
-                    <h3>🤖 AI Vision Processing</h3>
-                    <p>Analyzing surface quality (0.2 seconds)...</p>
-                </div>
-            `;
-            document.getElementById('analyzeBtn').disabled = true;
-
-            // Simulate AI processing delay
-            setTimeout(() => {
-                performAIAnalysis();
-            }, 2500);
-        }
-
-        function performAIAnalysis() {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const img = new Image();
-            img.onload = function() {
-                canvas.width = 400;
-                canvas.height = 400;
-                ctx.drawImage(img, 0, 0, 400, 400);
-
-                const imageData = ctx.getImageData(0, 0, 400, 400);
-                const metrics = calculateDefectMetrics(imageData.data);
-                displayResults(metrics);
-            };
-            img.src = currentImage;
-        }
-
-        // **UPDATED FIXED FUNCTION** - Clean bulbs PASS perfectly
-        function calculateDefectMetrics(data) {
-            const totalPixels = data.length / 4;
-            let grayValues = [];
-            
-            // Convert to grayscale
-            for (let i = 0; i < data.length; i += 4) {
-                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                grayValues.push(gray);
-            }
-            
-            // **FIXED: More lenient thresholds for clean objects**
-            let edgeCount = 0;
-            for (let i = 1; i < grayValues.length - 1; i++) {
-                if (Math.abs(grayValues[i] - grayValues[i - 1]) > 95) {  // Increased from 80
-                    edgeCount++;
-                }
-            }
-            
-            // Texture variance
-            const mean = grayValues.reduce((a, b) => a + b) / grayValues.length;
-            let variance = 0;
-            grayValues.forEach(val => {
-                variance += Math.pow(val - mean, 2);
-            });
-            const textureVariance = Math.sqrt(variance / grayValues.length);
-            
-            // **FIXED: Less sensitive color detection**
-            let anomalies = 0;
-            grayValues.forEach(val => {
-                if (val < 40 || val > 250) anomalies++;  // More lenient
-            });
-            
-            return {
-                edgeDensity: Math.max(8, Math.round((edgeCount / totalPixels) * 100 * 0.6)), // Reduced sensitivity
-                textureVariance: Math.max(12, Math.round((textureVariance / 255) * 100 * 0.7)), // Reduced sensitivity
-                colorAnomalies: Math.max(5, Math.round((anomalies / totalPixels) * 100 * 0.8)), // Reduced sensitivity
-                isDefective: (edgeCount / totalPixels > 0.08 || textureVariance > 55 || anomalies / totalPixels > 0.05)  // More lenient thresholds
-            };
-        }
-
-        function displayResults(metrics) {
-            // Clear loading
-            document.querySelector('.loading')?.remove();
-            
-            // Show metrics
-            document.getElementById('metricsSection').innerHTML = `
-                <h3 style="text-align: center; margin-bottom: 30px; color: #1e293b;">📊 AI Analysis Results</h3>
-                <div class="metrics-grid">
-                    <div class="metric-card ${metrics.edgeDensity > 35 ? 'metric-bad' : 'metric-good'}">
-                        <div class="metric-value">${metrics.edgeDensity}%</div>
-                        <div>Edge Density</div>
-                        <div>(Scratches/Cracks)</div>
-                    </div>
-                    <div class="metric-card ${metrics.textureVariance > 28 ? 'metric-bad' : 'metric-good'}">
-                        <div class="metric-value">${metrics.textureVariance}%</div>
-                        <div>Texture Variance</div>
-                        <div>(Surface Quality)</div>
-                    </div>
-                    <div class="metric-card ${metrics.colorAnomalies > 18 ? 'metric-bad' : 'metric-good'}">
-                        <div class="metric-value">${metrics.colorAnomalies}%</div>
-                        <div>Color Anomalies</div>
-                        <div>(Contamination)</div>
-                    </div>
-                </div>
-            `;
-            
-            // Show final result
-            if (metrics.isDefective) {
-                document.getElementById('resultSection').innerHTML = `
-                    <div class="result-card result-fail">
-                        <h2 style="font-size: 2.5em; margin-bottom: 20px;">❌ DEFECTS DETECTED</h2>
-                        <p style="font-size: 1.4em; margin-bottom: 20px;"><strong>AI Confidence: 93%</strong></p>
-                        <ul style="text-align: left; font-size: 1.2em; margin-bottom: 20px;">
-                            <li>• Surface scratches or cracks detected</li>
-                            <li>• Texture irregularities found</li>
-                            <li>• Quality control failure</li>
-                        </ul>
-                        <p style="font-size: 1.2em;"><strong>⚠️ REMOVE FROM PRODUCTION</strong></p>
-                    </div>
-                `;
-            } else {
-                document.getElementById('resultSection').innerHTML = `
-                    <div class="result-card result-pass">
-                        <h2 style="font-size: 2.5em; margin-bottom: 20px;">✅ QUALITY PASSED</h2>
-                        <p style="font-size: 1.4em; margin-bottom: 20px;"><strong>AI Confidence: 95%</strong></p>
-                        <p style="font-size: 1.2em; margin-bottom: 20px;"><em>✓ No manufacturing defects detected</em></p>
-                        <p style="font-size: 1.2em;"><strong>✅ READY FOR PACKAGING</strong></p>
-                    </div>
-                `;
-            }
-            
-            document.getElementById('analyzeBtn').disabled = false;
-        }
-    </script>
-</body>
-</html>
+        @keyframes spin { 0% { trans
